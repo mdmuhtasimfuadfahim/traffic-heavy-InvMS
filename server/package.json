@@ -9,6 +9,7 @@
     "dev": "nodemon src/server.js",
     "db:sync": "node scripts/syncDb.js",
     "db:seed": "node scripts/seed.js",
+    "db:reset": "node scripts/reset.js",
     "test": "jest --runInBand",
     "test:concurrency": "node scripts/concurrencyTest.js",
     "lint": "eslint src"

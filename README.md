@@ -226,5 +226,5 @@ If the deployed frontend gets a CORS error hitting the deployed API, check two t
 
 ### Live URLs
 
-- Frontend: _add your Vercel URL here after deploying_
-- Backend: _add your Render URL here after deploying_
+- Frontend: https://invms.vercel.app _(if Vercel had to suffix the project name for uniqueness, update this to whatever it actually assigned)_
+- Backend: https://invms-server.onrender.com

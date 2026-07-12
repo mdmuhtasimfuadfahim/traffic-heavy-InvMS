@@ -25,6 +25,10 @@ async function main() {
 
   httpServer.listen(PORT, () => {
     console.log(`API + WebSocket server listening on port ${PORT}`);
+    // Printed on every boot so a CORS mismatch can be confirmed from the
+    // Render logs alone, without needing to reproduce the error first -
+    // compare this exact string against the browser's actual Origin header.
+    console.log(`CORS: CLIENT_URL="${CLIENT_URL}"`);
   });
 }
 
