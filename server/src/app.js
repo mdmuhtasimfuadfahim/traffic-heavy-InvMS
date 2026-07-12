@@ -6,12 +6,14 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
+const { parseAllowedOrigins, buildOriginChecker } = require('./utils/corsOrigins');
 
 function createApp({ corsOrigin }) {
   const app = express();
+  const allowedOrigins = parseAllowedOrigins(corsOrigin);
 
   app.use(helmet());
-  app.use(cors({ origin: corsOrigin }));
+  app.use(cors({ origin: buildOriginChecker(allowedOrigins) }));
   app.use(express.json());
   if (process.env.NODE_ENV !== 'test') {
     app.use(morgan('dev'));

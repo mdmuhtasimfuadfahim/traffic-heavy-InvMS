@@ -1,11 +1,14 @@
 const { Server } = require('socket.io');
+const { parseAllowedOrigins, buildOriginChecker } = require('./utils/corsOrigins');
 
 let io = null;
 
 function initSocket(httpServer, corsOrigin) {
+  const allowedOrigins = parseAllowedOrigins(corsOrigin);
+
   io = new Server(httpServer, {
     cors: {
-      origin: corsOrigin,
+      origin: buildOriginChecker(allowedOrigins),
       methods: ['GET', 'POST'],
     },
   });

@@ -20,6 +20,8 @@ services:
       - key: DB_SSL
         value: "true"
       - key: CLIENT_URL
-        sync: false # set manually to your deployed Vercel URL, e.g. https://invms.vercel.app
+        sync: false # set manually to your deployed Vercel URL(s), comma-separated if more than one,
+        # e.g. https://invms.vercel.app,https://invms-git-main-you.vercel.app - must match exactly
+        # (scheme + host + port, no trailing slash) or the browser will block requests with a CORS error
       - key: RESERVATION_WINDOW_SECONDS
         value: 60
