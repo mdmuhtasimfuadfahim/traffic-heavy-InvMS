@@ -1,18 +1,5 @@
 name: Deploy Backend (Render)
 
-# Runs the server/ test suite against a real Postgres instance, then - only
-# if it passes - triggers a Render deploy hook to ship server/ to production.
-#
-# Why Render instead of Vercel for the API: Vercel's serverless functions
-# don't support long-lived Socket.io connections (a function terminates
-# after each response), so the Express + Socket.io server is deployed
-# somewhere that keeps a persistent process alive. The React frontend still
-# deploys to Vercel via deploy-frontend.yml.
-#
-# Required repo secret:
-#   RENDER_DEPLOY_HOOK_URL - Render dashboard -> invms-server -> Settings ->
-#                            Deploy Hook (create one, then paste the URL here)
-
 on:
   push:
     branches: [main]

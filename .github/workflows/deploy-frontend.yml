@@ -1,16 +1,5 @@
 name: Deploy Frontend (Vercel)
 
-# Builds and deploys the React app in client/ to production on Vercel.
-#
-# Required repo secrets (Settings -> Secrets and variables -> Actions):
-#   VERCEL_TOKEN       - Vercel account/team access token
-#   VERCEL_ORG_ID      - from `vercel link` -> .vercel/project.json (orgId)
-#   VERCEL_PROJECT_ID  - from `vercel link` -> .vercel/project.json (projectId)
-#
-# Set VITE_API_URL as an Environment Variable on the Vercel project itself
-# (Project Settings -> Environment Variables), pointing at your deployed
-# backend, e.g. https://invms-server.onrender.com
-
 on:
   push:
     branches: [main]
