@@ -22,7 +22,6 @@ export function useSocket() {
   const applyPurchase = useStore((s) => s.applyPurchase);
   const addDrop = useStore((s) => s.addDrop);
   const clearReservation = useStore((s) => s.clearReservation);
-  const myReservations = useStore((s) => s.myReservations);
 
   useEffect(() => {
     const socket = io(API_URL, { transports: ['websocket', 'polling'] });

@@ -36,13 +36,23 @@ jobs:
           node-version: 20
 
       - name: Install Vercel CLI
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
         run: npm install --global vercel@latest
 
       - name: Pull Vercel project settings
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Skipped (no Vercel token configured yet)
+        if: ${{ secrets.VERCEL_TOKEN == '' }}
+        run: |
+          echo "VERCEL_TOKEN secret is not set - skipping deploy."
+          echo "See README.md > Deployment > Vercel for how to create and add it."
