@@ -1,0 +1,25 @@
+# Render "Blueprint" - lets you spin up the backend with one click via
+# Render's "New +" -> "Blueprint" flow, pointed at this repo.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: invms-server
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 8977
+      - key: DATABASE_URL
+        sync: false # set manually in the Render dashboard to your Neon connection string
+      - key: DB_SSL
+        value: "true"
+      - key: CLIENT_URL
+        sync: false # set manually to your deployed Vercel URL, e.g. https://invms.vercel.app
+      - key: RESERVATION_WINDOW_SECONDS
+        value: 60

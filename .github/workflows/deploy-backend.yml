@@ -1,0 +1,61 @@
+name: Deploy Backend (Render)
+
+# Runs the server/ test suite against a real Postgres instance, then - only
+# if it passes - triggers a Render deploy hook to ship server/ to production.
+#
+# Why Render instead of Vercel for the API: Vercel's serverless functions
+# don't support long-lived Socket.io connections (a function terminates
+# after each response), so the Express + Socket.io server is deployed
+# somewhere that keeps a persistent process alive. The React frontend still
+# deploys to Vercel via deploy-frontend.yml.
+#
+# Required repo secret:
+#   RENDER_DEPLOY_HOOK_URL - Render dashboard -> invms-server -> Settings ->
+#                            Deploy Hook (create one, then paste the URL here)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: invms_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    defaults:
+      run:
+        working-directory: server
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/invms_test
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm install
+      - run: npm test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy hook
+        run: curl --fail --silent --show-error -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
