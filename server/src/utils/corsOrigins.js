@@ -36,6 +36,12 @@ function buildOriginChecker(allowedOrigins) {
     if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
+    // Logged server-side (visible in Render logs) so a mismatch - a stray
+    // trailing slash, http vs https, a new preview URL - is easy to spot
+    // instead of guessing from the browser's generic CORS error.
+    console.warn(
+      `CORS rejected origin "${origin}". Allowed origins: [${allowedOrigins.join(', ')}]`
+    );
     callback(new Error(`Origin "${origin}" is not allowed by CORS. Add it to CLIENT_URL.`));
   };
 }

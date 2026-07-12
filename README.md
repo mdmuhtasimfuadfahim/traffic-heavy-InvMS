@@ -217,6 +217,13 @@ Then create a **Deploy Hook** (Settings → Deploy Hook) and save its URL as the
 
 No database credentials or `.env` files are committed anywhere in this repo - `DATABASE_URL` is set directly in the Render dashboard, and `VITE_API_URL` directly in the Vercel dashboard.
 
+### Troubleshooting CORS between Vercel and Render
+
+If the deployed frontend gets a CORS error hitting the deployed API, check two things:
+
+1. **`CLIENT_URL` on Render must exactly match the frontend's origin** - scheme, host, and port, no trailing slash (e.g. `https://your-app.vercel.app`, not `https://your-app.vercel.app/`). It accepts a comma-separated list if you need to allow more than one origin (production domain + a preview domain). Any request from an origin not in that list is logged server-side (`CORS rejected origin "..."`, visible in the Render service logs) so a mismatch is easy to spot instead of guessing from the browser console.
+2. **Helmet's `Cross-Origin-Resource-Policy` header.** Helmet defaults to `same-origin`, which makes Chrome block cross-origin `fetch()` responses even when `Access-Control-Allow-Origin` is correct - indistinguishable from a real CORS error in the console. `server/src/app.js` sets this to `cross-origin` explicitly, since this API is meant to be called from a different origin (Vercel) by design.
+
 ### Live URLs
 
 - Frontend: _add your Vercel URL here after deploying_
