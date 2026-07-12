@@ -11,12 +11,26 @@ const RESERVATION_WINDOW_MS = (Number(process.env.RESERVATION_WINDOW_SECONDS) ||
 // "Architecture Choice" section) in case the process restarts and loses timers.
 const timers = new Map();
 
-function scheduleExpiration(reservationId, onExpire) {
+// Every code path that can expire a reservation (the per-reservation timer,
+// the boot-time re-arm, and the backup sweep) needs to broadcast the same
+// way - a socket.io emit. Rather than thread an `onExpire` callback through
+// every call site (easy to forget - see the bug this replaced, where
+// reserveItem's own scheduleExpiration() call never passed one, so the
+// timer that fires when someone reserves-and-walks-away updated the
+// database correctly but silently never told any connected client), the
+// server registers a single notifier once at boot via setExpirationNotifier.
+let notifyExpired = () => {};
+
+function setExpirationNotifier(fn) {
+  notifyExpired = typeof fn === 'function' ? fn : () => {};
+}
+
+function scheduleExpiration(reservationId) {
   const timer = setTimeout(async () => {
     timers.delete(reservationId);
     try {
       const result = await expireReservation(reservationId);
-      if (result && onExpire) onExpire(result);
+      if (result) notifyExpired(result);
     } catch (err) {
       console.error(`Failed to expire reservation ${reservationId}:`, err.message);
     }
@@ -210,7 +224,7 @@ async function cancelReservation({ reservationId, userId }) {
  * per-reservation timers because expireReservation() is idempotent (it only
  * acts on reservations still in 'active' status).
  */
-async function sweepExpiredReservations(onExpire) {
+async function sweepExpiredReservations() {
   const expired = await Reservation.findAll({
     where: { status: 'active' },
     attributes: ['id', 'expiresAt'],
@@ -222,7 +236,7 @@ async function sweepExpiredReservations(onExpire) {
   for (const r of due) {
     try {
       const result = await expireReservation(r.id);
-      if (result && onExpire) onExpire(result);
+      if (result) notifyExpired(result);
     } catch (err) {
       console.error(`Sweep failed to expire reservation ${r.id}:`, err.message);
     }
@@ -236,7 +250,7 @@ async function sweepExpiredReservations(onExpire) {
  * (e.g. process restarted mid-flight) so we don't have to wait for the sweep
  * interval to reclaim their stock.
  */
-async function rearmActiveReservations(onExpire) {
+async function rearmActiveReservations() {
   const active = await Reservation.findAll({ where: { status: 'active' } });
   const now = Date.now();
 
@@ -244,12 +258,12 @@ async function rearmActiveReservations(onExpire) {
     const msLeft = new Date(r.expiresAt).getTime() - now;
     if (msLeft <= 0) {
       const result = await expireReservation(r.id);
-      if (result && onExpire) onExpire(result);
+      if (result) notifyExpired(result);
     } else {
       const timer = setTimeout(async () => {
         timers.delete(r.id);
         const result = await expireReservation(r.id);
-        if (result && onExpire) onExpire(result);
+        if (result) notifyExpired(result);
       }, msLeft);
       timers.set(r.id, timer);
     }
@@ -257,6 +271,7 @@ async function rearmActiveReservations(onExpire) {
 }
 
 module.exports = {
+  setExpirationNotifier,
   reserveItem,
   purchaseReservation,
   cancelReservation,

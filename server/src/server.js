@@ -4,6 +4,7 @@ const createApp = require('./app');
 const { sequelize } = require('./models');
 const { initSocket, EVENTS } = require('./socket');
 const { startScheduler } = require('./services/scheduler');
+const reservationService = require('./services/reservationService');
 
 const PORT = process.env.PORT || 8977;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5601';
@@ -16,12 +17,16 @@ async function main() {
   const httpServer = http.createServer(app);
   const io = initSocket(httpServer, CLIENT_URL);
 
-  // Any reservation reclaimed by the expiration timer or the backup sweep
-  // broadcasts a stock update to every connected client.
-  startScheduler((result) => {
+  // Registered once, used by every path that can expire a reservation: the
+  // per-reservation timer armed the moment someone reserves an item, the
+  // boot-time re-arm, and the backup sweep. Any reservation reclaimed by any
+  // of them broadcasts a stock update to every connected client.
+  reservationService.setExpirationNotifier((result) => {
     io.emit(EVENTS.STOCK_UPDATE, { dropId: result.dropId, availableStock: result.availableStock });
     io.emit(EVENTS.RESERVATION_EXPIRED, { reservationId: result.reservationId, dropId: result.dropId });
   });
+
+  startScheduler();
 
   httpServer.listen(PORT, () => {
     console.log(`API + WebSocket server listening on port ${PORT}`);
