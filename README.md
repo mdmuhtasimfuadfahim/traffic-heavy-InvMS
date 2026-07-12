@@ -52,12 +52,12 @@ psql "$DATABASE_URL" -f server/schema.sql
 
 Schema summary:
 
-| Table | Purpose |
-|---|---|
-| `users` | one row per display name (no auth/password - see below) |
-| `drops` | a "Merch Drop": name, price, `total_stock`, live `available_stock`, `starts_at` |
-| `reservations` | one row per Reserve click: `status` (`active`/`completed`/`expired`/`cancelled`), `expires_at` |
-| `purchases` | one row per completed purchase, `reservation_id` is unique so a reservation can only ever convert once |
+| Table          | Purpose                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------ |
+| `users`        | one row per display name (no auth/password - see below)                                                |
+| `drops`        | a "Merch Drop": name, price, `total_stock`, live `available_stock`, `starts_at`                        |
+| `reservations` | one row per Reserve click: `status` (`active`/`completed`/`expired`/`cancelled`), `expires_at`         |
+| `purchases`    | one row per completed purchase, `reservation_id` is unique so a reservation can only ever convert once |
 
 ### 2. Run the backend
 
@@ -89,10 +89,10 @@ curl -X POST http://localhost:8977/api/drops \
 
 ## Architecture choice: the 60-second expiration
 
-Each reservation is a row in `reservations` with an `expires_at` timestamp (`created_at + 60s`). Three layers work together so the expiration is both *fast* and *correct even if the server restarts*:
+Each reservation is a row in `reservations` with an `expires_at` timestamp (`created_at + 60s`). Three layers work together so the expiration is both _fast_ and _correct even if the server restarts_:
 
 1. **`setTimeout` per reservation** (`server/src/services/reservationService.js`, `scheduleExpiration`). The moment a reservation is created, a 60-second timer is armed in memory. When it fires, it expires the reservation and returns the unit to `available_stock`. This is what makes the recovery feel instant in the demo.
-2. **A row lock, not a race, against purchase.** Expiring a reservation and completing a purchase both start by taking `SELECT ... FOR UPDATE` on the *same* reservation row inside a transaction. If a user clicks "Complete Purchase" in the same instant the timer fires, whichever transaction acquires the row lock first wins; the other sees the already-updated `status` and safely no-ops (or rejects with a clear error). There's no window where both could succeed, and no window where stock is double-counted.
+2. **A row lock, not a race, against purchase.** Expiring a reservation and completing a purchase both start by taking `SELECT ... FOR UPDATE` on the _same_ reservation row inside a transaction. If a user clicks "Complete Purchase" in the same instant the timer fires, whichever transaction acquires the row lock first wins; the other sees the already-updated `status` and safely no-ops (or rejects with a clear error). There's no window where both could succeed, and no window where stock is double-counted.
 3. **A backup sweep, because in-memory timers don't survive a restart.** In-memory timers are a single-process optimization. If the Node process restarts (deploys, crashes, autoscaling), any timers that hadn't fired yet are gone. To make this safe rather than just "usually fine", two things happen on top of the timers:
    - On boot, `rearmActiveReservations()` re-arms a fresh timer for every reservation still marked `active` (or expires it immediately if its window already passed while the process was down).
    - Every 15 seconds, `sweepExpiredReservations()` scans for any `active` reservation whose `expires_at` is in the past and expires it. This is the actual correctness guarantee; the timers are just there to make it feel real-time instead of "up to 15s late".
@@ -101,14 +101,18 @@ Both the timer path and the sweep path call the same `expireReservation()` funct
 
 ## Concurrency: preventing overselling
 
-This is the core requirement: *"If 100 users click Reserve at the exact same millisecond for the last 1 item, only 1 user should succeed."*
+This is the core requirement: _"If 100 users click Reserve at the exact same millisecond for the last 1 item, only 1 user should succeed."_
 
 The reservation endpoint does a single **conditional atomic UPDATE**, expressed through Sequelize as:
 
 ```js
 const [affectedCount, affectedRows] = await Drop.update(
-  { availableStock: sequelize.literal('available_stock - 1') },
-  { where: { id: dropId, availableStock: { [Op.gt]: 0 } }, transaction, returning: true }
+  { availableStock: sequelize.literal("available_stock - 1") },
+  {
+    where: { id: dropId, availableStock: { [Op.gt]: 0 } },
+    transaction,
+    returning: true,
+  },
 );
 ```
 
@@ -128,29 +132,29 @@ The `UPDATE` and the `Reservation.create()` that follows it run inside one Seque
 This is verified by an automated test and a load-test script, not just by reasoning about it:
 
 - `server/tests/reservation.test.js` fires 25 concurrent reservation requests (from 25 different users, via `Promise.all`) at a drop with exactly 1 unit of stock, and asserts exactly 1 succeeds and 24 get a `409 Sold out`.
-- `server/scripts/concurrencyTest.js` does the same thing against a *running* server over real HTTP, for a more true-to-life demo: `npm run test:concurrency` (see [Testing](#testing)).
+- `server/scripts/concurrencyTest.js` does the same thing against a _running_ server over real HTTP, for a more true-to-life demo: `npm run test:concurrency` (see [Testing](#testing)).
 
 ## API reference
 
 All responses are JSON. Errors: `{ "error": { "message": "...", "code": "..." } }`.
 
-| Method | Path | Body | Notes |
-|---|---|---|---|
-| `POST` | `/api/users` | `{ username }` | find-or-create; returns `{ user: { id, username } }` |
-| `GET` | `/api/drops` | - | list of drops, each with `availableStock`, `isLive`, `isSoldOut`, and nested `recentPurchasers` (last 3) |
-| `POST` | `/api/drops` | `{ name, price, totalStock, startsAt? }` | creates a drop ("Merch Drop API") |
-| `POST` | `/api/drops/:dropId/reservations` | `{ userId }` | atomic reserve; `409` if sold out |
-| `POST` | `/api/reservations/:id/purchase` | `{ userId }` | completes purchase; `403` if not your reservation, `409` if expired/already used |
-| `POST` | `/api/reservations/:id/cancel` | `{ userId }` | releases the reservation early, returns stock immediately |
+| Method | Path                              | Body                                     | Notes                                                                                                    |
+| ------ | --------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `POST` | `/api/users`                      | `{ username }`                           | find-or-create; returns `{ user: { id, username } }`                                                     |
+| `GET`  | `/api/drops`                      | -                                        | list of drops, each with `availableStock`, `isLive`, `isSoldOut`, and nested `recentPurchasers` (last 3) |
+| `POST` | `/api/drops`                      | `{ name, price, totalStock, startsAt? }` | creates a drop ("Merch Drop API")                                                                        |
+| `POST` | `/api/drops/:dropId/reservations` | `{ userId }`                             | atomic reserve; `409` if sold out                                                                        |
+| `POST` | `/api/reservations/:id/purchase`  | `{ userId }`                             | completes purchase; `403` if not your reservation, `409` if expired/already used                         |
+| `POST` | `/api/reservations/:id/cancel`    | `{ userId }`                             | releases the reservation early, returns stock immediately                                                |
 
 WebSocket events (`socket.io`), broadcast to all connected clients:
 
-| Event | Payload |
-|---|---|
-| `stock:update` | `{ dropId, availableStock }` |
-| `drop:created` | `{ drop }` |
-| `purchase:completed` | `{ dropId, purchase: { username, purchasedAt, price } }` |
-| `reservation:expired` | `{ reservationId, dropId }` |
+| Event                 | Payload                                                  |
+| --------------------- | -------------------------------------------------------- |
+| `stock:update`        | `{ dropId, availableStock }`                             |
+| `drop:created`        | `{ drop }`                                               |
+| `purchase:completed`  | `{ dropId, purchase: { username, purchasedAt, price } }` |
+| `reservation:expired` | `{ reservationId, dropId }`                              |
 
 ### A note on "Users"
 
@@ -204,12 +208,12 @@ Then create a **Deploy Hook** (Settings → Deploy Hook) and save its URL as the
 
 ### GitHub Actions secrets checklist
 
-| Secret | Where it comes from |
-|---|---|
-| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
-| `VERCEL_ORG_ID` | `client/.vercel/project.json` after `vercel link` |
-| `VERCEL_PROJECT_ID` | `client/.vercel/project.json` after `vercel link` |
-| `RENDER_DEPLOY_HOOK_URL` | Render → invms-server → Settings → Deploy Hook |
+| Secret                   | Where it comes from                               |
+| ------------------------ | ------------------------------------------------- |
+| `VERCEL_TOKEN`           | Vercel → Account Settings → Tokens                |
+| `VERCEL_ORG_ID`          | `client/.vercel/project.json` after `vercel link` |
+| `VERCEL_PROJECT_ID`      | `client/.vercel/project.json` after `vercel link` |
+| `RENDER_DEPLOY_HOOK_URL` | Render → invms-server → Settings → Deploy Hook    |
 
 No database credentials or `.env` files are committed anywhere in this repo - `DATABASE_URL` is set directly in the Render dashboard, and `VITE_API_URL` directly in the Vercel dashboard.
 
